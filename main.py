@@ -17,6 +17,7 @@ total_articles = 0
 wiki_dump_path = str(sys.argv[1])
 inverted_output_path = str(sys.argv[2])
 stat_file_path = str(sys.argv[3])
+dump_tokens = 0
 
 class WikiDumpHandler(xml.sax.ContentHandler):
 	def __init__(self):
@@ -81,20 +82,22 @@ class ProcessText:
 # process_text calls 
 ############################
 	def tokenize(self, data):
+		global dump_tokens
 		data = data.encode("ascii", errors="ignore").decode()
 		data = re.sub(r'http[^\ ]*\ ', r' ', data) 
 		data = re.sub(r'&nbsp;|&lt;|&gt;|&amp;|&quot;|&apos;', r' ', data) 
-		data = re.sub(r'\—|\%|\$|\'|\||\.|\*|\[|\]|\:|\;|\,|\{|\}|\(|\)|\=|\+|\-|\_|\#|\!|\`|\"|\?|\/|\>|\<|\&|\\|\u2013|\~|\n', r' ', data)
-		return data.split()	
+		data = re.sub(r'\—|\%|\$|\'|\||\.|\*|\[|\]|\:|\;|\,|\{|\}|\(|\)|\=|\+|\-|\_|\#|\!|\`|\"|\?|\/|\>|\<|\&|\\|\u2013|\~|\@|\n', r' ', data)
+		data = data.lower()
+		data = data.split()
+		dump_tokens += len(data)
+		return data
 
 	def removeStopWords(self, data):
 		return [w for w in data if w.lower() not in stopwords and len(w)>1]
 		# return data
 
 	def stem(self, data):
-		# text = []
-		# for element in data:
-			# text.append(stemmer.stem(element))
+		# data = data.lower()
 		return stemmer.stemWords(data)
 
 	def getTitle(self, text):
@@ -262,14 +265,22 @@ class Statfile:
 
 	def outputToStatfile(self):
 		global inverted_output_path
-		global stat
+		global stat_file_path
+		global dump_tokens
 		output_file = inverted_output_path + "index.txt"
-		print(output_file)
+		# print(output_file)
+		inverted_index_tokens = 0
 		file = open(output_file,"r")
-		content = file.read() 
-		inverted_index_tokens = len(content.split("\n")) - 1
-		# print(inverted_index_tokens)
-		
+		lines = file.readlines() 
+		for line in lines:
+			inverted_index_tokens += len(line.split(" ")) -1 
+		# inverted_index_tokens = len(content.split("\n")) - 1
+		file.close()
+		file = open(stat_file_path,"w")
+		file.write(str(dump_tokens) + "\n")
+		file.write(str(inverted_index_tokens) + "\n")
+		file.close()
+				
 
 # make parser
 start = time.time()
