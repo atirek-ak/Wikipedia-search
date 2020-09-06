@@ -8,8 +8,9 @@ from nltk.corpus import stopwords
 import Stemmer
 import time
 
+counter = 1
 page_titles = []
-document_terms = []
+document_terms = [] # stores number of terms in a document
 indexMap = defaultdict(list)
 article_number = 0 #stores total number of articles in the end
 # modules  
@@ -77,7 +78,11 @@ class ProcessText:
 			self.category = self.get_category(text[1])	
 			self.external_links = self.get_external_links(text[1])
 			self.references = self.get_references(text[1])
-		# print(self.title)
+		# words in the document after tokenization, stop word removal and stemming	
+		global document_terms
+		total_words = len(self.infobox) + len(self.body) + len(self.title) + len(self.category) + len(self.external_links) + len(self.references)
+		document_terms.append(total_words)
+		# create index
 		index = Index()
 		index.createIndex(self.title, self.body, self.infobox, self.category, self.external_links, self.references)
 
@@ -247,28 +252,39 @@ class PrintToFile:
 	def output_to_file(self):
 		global indexMap
 		global inverted_output_path
+		global counter
 		if not path.exists(inverted_output_path):
 			os.mkdir(inverted_output_path)
-		output_file = inverted_output_path + "index.txt"
+		output_file = inverted_output_path + "index" + str(counter)+".txt"
 		with open(output_file,"w") as out:
 			for i,word in enumerate(sorted(indexMap.keys())):
 				# print(f'{"Word postings written to file: "+str(i+1)}\r', end="")
 				postings = indexMap[word]
 				# print(str(word)+" "+" ".join(postings))
 				out.write(str(word)+" "+" ".join(postings)+"\n")
+		# clear global variables for next iteration
+		indexMap = defaultdict(list)
+
 
 ############################################
-
+# also prints number of terms of document in the dam file 
 class TitlesFile:
 	def __init__(self):
 		pass
 
 	def output_to_file(self):
 		global page_titles
+		global document_terms
 		output_file = "titles.txt"
 		with open(output_file,"w") as out:
 			for i in enumerate(page_titles):
-				out.write(str(i[0])+" "+str(i[1])+"\n")
+				out.write(str(i[0])+" "+str(i[1])+":" + str(document_terms[i[0]]) + "\n")
+		# store total number of documents in a file
+		# global article_number
+		# output_file = "total_documents.txt"
+		# with open(output_file, "w") as out:
+			# out.write(str(article_number) + "\n")
+
 
 ############################################
 				
@@ -282,13 +298,17 @@ parser.setFeature(xml.sax.handler.feature_namespaces, 0)
 # change the handler
 Handler = WikiDumpHandler()
 parser.setContentHandler(Handler)
+printIndex = PrintToFile()
 for file in os.listdir(wiki_dump_path):
 	if file[0] != '.':
+		start = time.time()
 		parser.parse(str(wiki_dump_path)+str(file))
-# print to index.txt
+		print("Time taken = " + str(time.time() - start))
+		start = time.time()
+		printIndex.output_to_file()
+		counter += 1
+		print("Time taken = " + str(time.time() - start))
 # start = time.time()
-# printObject = PrintToFile()
-# printObject.output_to_file()
 # print("Time taken = " + str(time.time() - start))
-# TitleObject = TitlesFile()
-# TitleObject.output_to_file()
+TitleObject = TitlesFile()
+TitleObject.output_to_file()
