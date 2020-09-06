@@ -7,17 +7,17 @@ from collections import defaultdict
 from nltk.corpus import stopwords
 import Stemmer
 import time
-# from nltk.stem import SnowballStemmer
 
-# stemmer = SnowballStemmer('english')
+page_titles = []
+document_terms = []
+indexMap = defaultdict(list)
+article_number = 0 #stores total number of articles in the end
+# modules  
 stemmer = Stemmer.Stemmer('english')
 stopwords = set(stopwords.words('english'))
-indexMap = defaultdict(list)
-total_articles = 0
+# args
 wiki_dump_path = str(sys.argv[1])
 inverted_output_path = str(sys.argv[2])
-stat_file_path = str(sys.argv[3])
-dump_tokens = 0
 
 class WikiDumpHandler(xml.sax.ContentHandler):
 	def __init__(self):
@@ -27,11 +27,10 @@ class WikiDumpHandler(xml.sax.ContentHandler):
 
 	# called automatically by the parser
 	def startElement(self,tag,attributes):
-		global total_articles
 		self.cur_type = tag
 		if tag == "page":
-			total_articles += 1
-
+			global article_number
+			article_number += 1
 
 	# called automatically by parser when content inside 
 	# the tag is encountered
@@ -45,13 +44,16 @@ class WikiDumpHandler(xml.sax.ContentHandler):
 	# called automatically by the parser
 	def endElement(self,tag):
 		if tag == "page":
+			global page_titles
+			page_titles.append(self.refine(self.title))
 			process_text = ProcessText()
 			process_text.first_call(self.title, self.body)
-			# global total_articles
-			# print(total_articles)
 			self.body = ""
 			self.title = ""
 			self.cur_type = ""
+
+	def refine(self, title):
+		return title.strip().lower()
 
 ##################################################
 
@@ -82,15 +84,13 @@ class ProcessText:
 # process_text calls 
 ############################
 	def tokenize(self, data):
-		global dump_tokens
 		data = data.encode("ascii", errors="ignore").decode()
 		data = re.sub(r'http[^\ ]*\ ', r' ', data) 
 		data = re.sub(r'&nbsp;|&lt;|&gt;|&amp;|&quot;|&apos;', r' ', data) 
 		data = re.sub(r'\—|\%|\$|\'|\||\.|\*|\[|\]|\:|\;|\,|\{|\}|\(|\)|\=|\+|\-|\_|\#|\!|\`|\"|\?|\/|\>|\<|\&|\\|\u2013|\~|\@|\n', r' ', data)
 		data = data.lower()
-		data = data.split()
-		dump_tokens += len(data)
-		return data
+		# data = data.split()
+		return data.split()
 
 	def removeStopWords(self, data):
 		return [w for w in data if w.lower() not in stopwords and len(w)>1]
@@ -184,7 +184,7 @@ class Index:
 
 	def createIndex(self, title, body, infobox, category, external_links, references):
 		global indexMap
-		global total_articles
+		global article_number
 		words = defaultdict(int)
 		d = defaultdict(int)
 		for word in title:
@@ -223,7 +223,7 @@ class Index:
 			c = category_index[word]
 			l = external_links_index[word]
 			r = references_index[word]
-			string = 'd' + str(total_articles)
+			string = 'd' + str(article_number)
 			if t:
 				string += 't' + str(t)
 			if b:
@@ -259,31 +259,22 @@ class PrintToFile:
 
 ############################################
 
-class Statfile:
+class TitlesFile:
 	def __init__(self):
 		pass
 
-	def outputToStatfile(self):
-		global inverted_output_path
-		global stat_file_path
-		global dump_tokens
-		output_file = inverted_output_path + "index.txt"
-		# print(output_file)
-		inverted_index_tokens = 0
-		file = open(output_file,"r")
-		lines = file.readlines() 
-		for line in lines:
-			inverted_index_tokens += len(line.split(" ")) -1 
-		# inverted_index_tokens = len(content.split("\n")) - 1
-		file.close()
-		file = open(stat_file_path,"w")
-		file.write(str(dump_tokens) + "\n")
-		file.write(str(inverted_index_tokens) + "\n")
-		file.close()
+	def output_to_file(self):
+		global page_titles
+		output_file = "titles.txt"
+		with open(output_file,"w") as out:
+			for i in enumerate(page_titles):
+				out.write(str(i[0])+" "+str(i[1])+"\n")
+
+############################################
 				
 
 # make parser
-start = time.time()
+# start = time.time()
 parser = xml.sax.make_parser()
 # turn off namepsaces so that startElement and endElement 
 # are called for every tag
@@ -291,12 +282,13 @@ parser.setFeature(xml.sax.handler.feature_namespaces, 0)
 # change the handler
 Handler = WikiDumpHandler()
 parser.setContentHandler(Handler)
-parser.parse(wiki_dump_path)
+for file in os.listdir(wiki_dump_path):
+	if file[0] != '.':
+		parser.parse(str(wiki_dump_path)+str(file))
 # print to index.txt
-print("Time taken = " + str(time.time() - start))
-start = time.time()
-printObject = PrintToFile()
-printObject.output_to_file()
-print("Time taken = " + str(time.time() - start))
-StatFileObject = Statfile()
-StatFileObject.outputToStatfile()
+# start = time.time()
+# printObject = PrintToFile()
+# printObject.output_to_file()
+# print("Time taken = " + str(time.time() - start))
+# TitleObject = TitlesFile()
+# TitleObject.output_to_file()
