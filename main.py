@@ -8,8 +8,9 @@ from nltk.corpus import stopwords
 import Stemmer
 import time
 
-counter = 1
-page_titles = []
+total_documents = 0 # stores number of files inverted index is divided into
+total_titles = 1 # total title file
+titles_map = defaultdict(list)
 document_terms = [] # stores number of terms in a document
 indexMap = defaultdict(list)
 article_number = 0 #stores total number of articles in the end
@@ -29,9 +30,7 @@ class WikiDumpHandler(xml.sax.ContentHandler):
 	# called automatically by the parser
 	def startElement(self,tag,attributes):
 		self.cur_type = tag
-		if tag == "page":
-			global article_number
-			article_number += 1
+			
 
 	# called automatically by parser when content inside 
 	# the tag is encountered
@@ -45,8 +44,10 @@ class WikiDumpHandler(xml.sax.ContentHandler):
 	# called automatically by the parser
 	def endElement(self,tag):
 		if tag == "page":
-			global page_titles
-			page_titles.append(self.refine(self.title))
+			global titles_map
+			global article_number
+			article_number += 1
+			titles_map[article_number].append(self.refine(self.title))
 			process_text = ProcessText()
 			process_text.first_call(self.title, self.body)
 			self.body = ""
@@ -242,7 +243,16 @@ class Index:
 			if r:
 				string += 'r' + str(r)
 			indexMap[word].append(string)
+		# print(article_number%20000==0)	
+		if article_number%20000 == 0:
+			printIndex = PrintToFile()
+			printIndex.output_to_file()
+			print("20k done")
 
+		if article_number%100000 == 0:	
+			TitleObject = TitlesFile()
+			TitleObject.output_to_file()
+			print("1L titles done")
 
 #####################################
 class PrintToFile:
@@ -252,10 +262,11 @@ class PrintToFile:
 	def output_to_file(self):
 		global indexMap
 		global inverted_output_path
-		global counter
+		global total_documents
+		total_documents += 1
 		if not path.exists(inverted_output_path):
 			os.mkdir(inverted_output_path)
-		output_file = inverted_output_path + "index" + str(counter)+".txt"
+		output_file = inverted_output_path + "index" + str(total_documents)+".txt"
 		with open(output_file,"w") as out:
 			for i,word in enumerate(sorted(indexMap.keys())):
 				# print(f'{"Word postings written to file: "+str(i+1)}\r', end="")
@@ -265,7 +276,6 @@ class PrintToFile:
 		# clear global variables for next iteration
 		indexMap = defaultdict(list)
 
-
 ############################################
 # also prints number of terms of document in the dam file 
 class TitlesFile:
@@ -273,18 +283,20 @@ class TitlesFile:
 		pass
 
 	def output_to_file(self):
-		global page_titles
+		global titles_map
 		global document_terms
-		output_file = "titles.txt"
+		global total_titles
+		output_path = "./title/"
+		if not path.exists(output_path):
+			os.mkdir(output_path)
+		output_file = output_path + "title" + str(total_titles/5) + ".txt"
 		with open(output_file,"w") as out:
-			for i in enumerate(page_titles):
-				out.write(str(i[0])+" "+str(i[1])+":" + str(document_terms[i[0]]) + "\n")
-		# store total number of documents in a file
-		# global article_number
-		# output_file = "total_documents.txt"
-		# with open(output_file, "w") as out:
-			# out.write(str(article_number) + "\n")
-
+			for i,index in enumerate(titles_map):
+				title = titles_map[index]
+				out.write(str(index) + " " + str(title[0]) + ":" + str(document_terms[i]) + "\n")
+		document_terms = []
+		titles_map = defaultdict(list)	
+		total_titles += 1			
 
 ############################################
 				
@@ -298,17 +310,15 @@ parser.setFeature(xml.sax.handler.feature_namespaces, 0)
 # change the handler
 Handler = WikiDumpHandler()
 parser.setContentHandler(Handler)
-printIndex = PrintToFile()
 for file in os.listdir(wiki_dump_path):
 	if file[0] != '.':
 		start = time.time()
 		parser.parse(str(wiki_dump_path)+str(file))
 		print("Time taken = " + str(time.time() - start))
-		start = time.time()
-		printIndex.output_to_file()
-		counter += 1
-		print("Time taken = " + str(time.time() - start))
-# start = time.time()
-# print("Time taken = " + str(time.time() - start))
+
+# print remaining entries
+printIndex = PrintToFile()
+printIndex.output_to_file()
 TitleObject = TitlesFile()
-TitleObject.output_to_file()
+TitleObject.output_to_file()		
+print("remaining done")
