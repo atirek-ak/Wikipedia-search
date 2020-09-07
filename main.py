@@ -1,4 +1,4 @@
-# inbuilt python modules
+import heapq
 import os, sys
 from os import path
 import xml.sax
@@ -8,7 +8,7 @@ from nltk.corpus import stopwords
 import Stemmer
 import time
 
-total_documents = 0 # stores number of files inverted index is divided into
+total_documents = 99 # stores number of files inverted index is divided into
 total_titles = 1 # total title file
 titles_map = defaultdict(list)
 document_terms = [] # stores number of terms in a document
@@ -106,12 +106,6 @@ class ProcessText:
 		# data = data.lower()
 		return stemmer.stemWords(data)
 
-	def getTitle(self, text):
-		data = self.tokenize(text)
-		data = self.removeStopWords(data)
-		data = self.stem(data)
-		return data	
-
 # get body
 	def getBody(self, text):
 		data = re.sub(r'\{\{.*\}\}', r' ', text)
@@ -119,6 +113,25 @@ class ProcessText:
 		data = self.removeStopWords(data)
 		data = self.stem(data)
 		return data	
+
+	def getTitle(self, text):
+		data = self.tokenize(text)
+		data = self.removeStopWords(data)
+		data = self.stem(data)
+		return data	
+
+# extract external links
+	def get_external_links(self, text):
+		data = text.split('\n')
+		links = []
+		for line in data:
+			if re.match(r'\*[\ ]*\[', line):
+				links.append(line)
+			
+		data = self.tokenize(' '.join(links))
+		data = self.removeStopWords(data)
+		data = self.stem(data)
+		return data		
 
 # extract info box
 	def getInfobox(self, text):
@@ -140,9 +153,9 @@ class ProcessText:
 		data = self.tokenize(' '.join(info))
 		data = self.removeStopWords(data)
 		data = self.stem(data)
-		return data
+		return data		
 
-	# extract category
+# extract category
 	def get_category(self, text):
 		data = text.split('\n')
 		# print(data)
@@ -155,22 +168,9 @@ class ProcessText:
 		data = self.tokenize(' '.join(categories))
 		data = self.removeStopWords(data)
 		data = self.stem(data)
-		return data
+		return data		
 
-	# extract external links
-	def get_external_links(self, text):
-		data = text.split('\n')
-		links = []
-		for line in data:
-			if re.match(r'\*[\ ]*\[', line):
-				links.append(line)
-			
-		data = self.tokenize(' '.join(links))
-		data = self.removeStopWords(data)
-		data = self.stem(data)
-		return data
-	
-	# extract references
+# extract references
 	def get_references(self, text):
 		data = text.split('\n')
 		refs = []
@@ -180,7 +180,7 @@ class ProcessText:
 		data = self.tokenize(' '.join(refs))
 		data = self.removeStopWords(data)
 		data = self.stem(data)
-		return data
+		return data		
 	
 #####################
 
@@ -223,31 +223,31 @@ class Index:
 			words[word] += 1
 		references_index = d
 		for word in words.keys():
-			t = title_index[word]
-			b = body_index[word]
-			i = infobox_index[word]
-			c = category_index[word]
-			l = external_links_index[word]
-			r = references_index[word]
 			string = 'd' + str(article_number)
+			t = title_index[word]
 			if t:
 				string += 't' + str(t)
+			b = body_index[word]
 			if b:
 				string += 'b' + str(b)
+			i = infobox_index[word]
 			if i:
 				string += 'i' + str(i)
+			c = category_index[word]
 			if c:
 				string += 'c' + str(c)
+			l = external_links_index[word]
 			if l:
 				string += 'l' + str(l)
+			r = references_index[word]
 			if r:
 				string += 'r' + str(r)
 			indexMap[word].append(string)
 		# print(article_number%20000==0)	
-		if article_number%20000 == 0:
+		if article_number%100000 == 0:
 			printIndex = PrintToFile()
 			printIndex.output_to_file()
-			print("20k done")
+			print("1L done")
 
 		if article_number%100000 == 0:	
 			TitleObject = TitlesFile()
@@ -289,7 +289,7 @@ class TitlesFile:
 		output_path = "./title/"
 		if not path.exists(output_path):
 			os.mkdir(output_path)
-		output_file = output_path + "title" + str(total_titles/5) + ".txt"
+		output_file = output_path + "title" + str(total_titles) + ".txt"
 		with open(output_file,"w") as out:
 			for i,index in enumerate(titles_map):
 				title = titles_map[index]
@@ -299,26 +299,98 @@ class TitlesFile:
 		total_titles += 1			
 
 ############################################
+
+class Merge:
+	def __init__(self):
+		global total_documents
+		self.cur_file = 1
+		self.total_documents = total_documents
+		self.input_path = "./index/"
+		self.output_path = "./Inverted Index/"
+		self.files = {}
+		self.flag = [0] * total_documents
+		self.top = {}
+		self.heap = []
+		self.words = {}
+		self.count = 0
+		self.data = defaultdict(list)
+
+	def mergeFiles(self):
+		if not path.exists(self.output_path):
+			os.mkdir(self.output_path)
+		for i in range(self.total_documents):
+			filename = "./index/index" + str(i+1) + ".txt"
+			self.files[i] = open(filename,"r")
+			self.flag[i] = 1
+			self.top[i] = self.files[i].readline().strip()
+			self.words[i] = self.top[i].split()
+			# print(self.words[i][0])
+			if self.words[i][0] not in self.heap:
+				heapq.heappush(self.heap, self.words[i][0])
+		
+		while any(self.flag) == 1:
+			self.count += 1
+			temp = heapq.heappop(self.heap)
+			for i in range(self.total_documents):
+				if self.flag[i]:
+					if self.words[i][0] == temp:
+						self.data[temp].extend(self.words[i][1:])
+						self.top[i] = self.files[i].readline().strip()
+						if self.top[i] == '':
+							self.flag[i] = 0
+							self.files[i].close()
+						else:
+							self.words[i] = self.top[i].split()
+							if self.words[i][0] not in self.heap:
+								heapq.heappush(self.heap, self.words[i][0])
+			
+			if self.count % 500000 == 0:
+				self.output_to_file()
+				print(str(self.count) + " done")
+		# print remaining		
+		self.output_to_file()
+		print("remaining done")		
+
+	def output_to_file(self):
+		filename = self.output_path + str(self.cur_file) + ".txt"
+		with open(filename,"w") as out:
+			for i,word in enumerate(sorted(self.data.keys())):
+				out.write(str(word)+" "+" ".join(self.data[word])+"\n")
+		
+		self.data = defaultdict(list)
+		self.cur_file += 1	
+############################################
 				
 
 # make parser
 # start = time.time()
-parser = xml.sax.make_parser()
+# parser = xml.sax.make_parser()
 # turn off namepsaces so that startElement and endElement 
 # are called for every tag
-parser.setFeature(xml.sax.handler.feature_namespaces, 0)
+# parser.setFeature(xml.sax.handler.feature_namespaces, 0)
 # change the handler
-Handler = WikiDumpHandler()
-parser.setContentHandler(Handler)
-for file in os.listdir(wiki_dump_path):
-	if file[0] != '.':
-		start = time.time()
-		parser.parse(str(wiki_dump_path)+str(file))
-		print("Time taken = " + str(time.time() - start))
-
+# Handler = WikiDumpHandler()
+# parser.setContentHandler(Handler)
+# done = 1
+initial = time.time()
+# for file in os.listdir(wiki_dump_path):
+	# if file[0] != '.':
+		# start = time.time()
+		# parser.parse(str(wiki_dump_path)+str(file))
+		# print("Done " + str(done))
+		# print("Time taken = " + str(time.time() - start))
+		# print("Total time taken = " + str(time.time() - initial))
+		# done += 1
+# 
 # print remaining entries
-printIndex = PrintToFile()
-printIndex.output_to_file()
-TitleObject = TitlesFile()
-TitleObject.output_to_file()		
-print("remaining done")
+# printIndex = PrintToFile()
+# printIndex.output_to_file()
+# TitleObject = TitlesFile()
+# TitleObject.output_to_file()		
+# print("remaining done")
+# with open("total.txt","w") as out:
+	# out.write(str(total_documents))
+# merge files
+mergeObject = Merge()
+mergeObject.mergeFiles()
+print("Total time taken = " + str(time.time() - initial))
