@@ -55,7 +55,7 @@ class WikiDumpHandler(xml.sax.ContentHandler):
 			self.cur_type = ""
 
 	def refine(self, title):
-		return title.strip()
+		return title.strip().lower()
 
 ##################################################
 
@@ -319,7 +319,7 @@ class Merge:
 		if not path.exists(self.output_path):
 			os.mkdir(self.output_path)
 		for i in range(self.total_documents):
-			filename = "./index/index" + str(i+100) + ".txt"
+			filename = "./index/index" + str(i+1) + ".txt"
 			self.files[i] = open(filename,"r")
 			self.flag[i] = 1
 			self.top[i] = self.files[i].readline().strip()
@@ -371,15 +371,17 @@ class Merge:
 # change the handler
 # Handler = WikiDumpHandler()
 # parser.setContentHandler(Handler)
-# initial = time.time()
+# done = 1
+initial = time.time()
 # for file in os.listdir(wiki_dump_path):
 	# if file[0] != '.':
 		# start = time.time()
 		# parser.parse(str(wiki_dump_path)+str(file))
-		# print("Done " + str(file))
+		# print("Done " + str(done))
 		# print("Time taken = " + str(time.time() - start))
 		# print("Total time taken = " + str(time.time() - initial))
-
+		# done += 1
+# 
 # print remaining entries
 # printIndex = PrintToFile()
 # printIndex.output_to_file()
