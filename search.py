@@ -85,7 +85,6 @@ class Search:
 		while word > line.split(' ')[0]:
 			line = file.readline()
 		if word == 	line.split(' ')[0]:
-			# print(line)
 			data = line.split(' ')
 			# data = [w.strip() for w in data if category in w]
 			self.getTFIDF(data, category)
