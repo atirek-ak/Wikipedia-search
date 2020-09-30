@@ -184,13 +184,13 @@ class Search:
 					self.words[i] = ' '.join(self.data).strip()
 				for i in range(0, len(self.words)):
 					self.search(self.words[i], self.categories[i])
-				ans = sorted(self.tfidf.items(),key=lambda item: item[1], reverse=True)[:self.k]
+				ans = sorted(self.tfidf.items(),key=lambda item: item[1])[:self.k]
 
 				with open("queries_op.txt","a") as out:
 					for item in ans:
 						out.write(str(item[0]) + ", " + str(' '.join(self.title[item[0]])) + "\n")
 					time_taken = time.time() - start
-					out.write(str(time_taken) + ", " + str(time_taken/self.k) + "\n")
+					out.write(str(time_taken) + ", " + str(time_taken/self.k) + "\n\n")
 				self.query = read_file.readline().strip()
 
 
